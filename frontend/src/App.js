@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import './App.css';
+import React, { useState, useEffect } from "react";
+import axios from "axios";
+import "./App.css";
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:4000/api';
+const API_BASE_URL =
+  process.env.REACT_APP_API_URL || "http://localhost:4000/api";
 
 function App() {
   const [meetings, setMeetings] = useState([]);
@@ -12,16 +13,49 @@ function App() {
 
   useEffect(() => {
     fetchMeetings();
-  }, []);
+    // Auto-refresh meetings every 5 seconds to show updated status
+    const interval = setInterval(async () => {
+      try {
+        const response = await axios.get(`${API_BASE_URL}/meetings`);
+        setMeetings(response.data.meetings);
+        // If there's a selected meeting, update it too
+        if (selectedMeeting) {
+          const updatedMeeting = response.data.meetings.find(
+            (m) => m._id === selectedMeeting._id
+          );
+          if (updatedMeeting) {
+            setSelectedMeeting(updatedMeeting);
+          }
+        }
+      } catch (error) {
+        console.error("Error auto-refreshing meetings:", error);
+      }
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [selectedMeeting?._id]);
 
   const fetchMeetings = async () => {
     try {
       const response = await axios.get(`${API_BASE_URL}/meetings`);
       setMeetings(response.data.meetings);
     } catch (error) {
-      console.error('Error fetching meetings:', error);
+      console.error("Error fetching meetings:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleMeetingClick = async (meeting) => {
+    setSelectedMeeting(meeting);
+    // Refresh meetings to get latest data
+    await fetchMeetings();
+    // Re-select the same meeting with updated data
+    const updatedMeetings = await axios.get(`${API_BASE_URL}/meetings`);
+    const updatedMeeting = updatedMeetings.data.meetings.find(
+      (m) => m._id === meeting._id
+    );
+    if (updatedMeeting) {
+      setSelectedMeeting(updatedMeeting);
     }
   };
 
@@ -31,39 +65,46 @@ function App() {
 
     setUploading(true);
     const formData = new FormData();
-    formData.append('audio', file);
-    formData.append('title', file.name.replace(/\.[^/.]+$/, ""));
+    formData.append("audio", file);
+    formData.append("title", file.name.replace(/\.[^/.]+$/, ""));
 
     try {
       const response = await axios.post(`${API_BASE_URL}/uploads`, formData, {
         headers: {
-          'Content-Type': 'multipart/form-data',
+          "Content-Type": "multipart/form-data",
         },
       });
-      
-      console.log('Upload successful:', response.data);
+
+      console.log("Upload successful:", response.data);
       fetchMeetings(); // Refresh the list
     } catch (error) {
-      console.error('Upload failed:', error);
-      alert('Upload failed. Please try again.');
+      console.error("Upload failed:", error);
+      alert("Upload failed. Please try again.");
     } finally {
       setUploading(false);
-      event.target.value = ''; // Reset file input
+      event.target.value = ""; // Reset file input
     }
   };
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'completed': return 'status-completed';
-      case 'transcribing': return 'status-transcribing';
-      case 'failed': return 'status-failed';
-      default: return 'status-uploaded';
+      case "completed":
+        return "status-completed";
+      case "transcribing":
+        return "status-transcribing";
+      case "failed":
+        return "status-failed";
+      default:
+        return "status-uploaded";
     }
   };
 
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString() + ' ' + 
-           new Date(dateString).toLocaleTimeString();
+    return (
+      new Date(dateString).toLocaleDateString() +
+      " " +
+      new Date(dateString).toLocaleTimeString()
+    );
   };
 
   if (loading) {
@@ -82,7 +123,9 @@ function App() {
       <header className="app-header">
         <div className="container">
           <h1>🎙️ Meeting Summarizer</h1>
-          <p>Upload audio files and get AI-generated summaries with action items</p>
+          <p>
+            Upload audio files and get AI-generated summaries with action items
+          </p>
         </div>
       </header>
 
@@ -114,25 +157,36 @@ function App() {
         <div className="card">
           <h2>Your Meetings</h2>
           {meetings.length === 0 ? (
-            <p>No meetings uploaded yet. Upload your first meeting audio above!</p>
+            <p>
+              No meetings uploaded yet. Upload your first meeting audio above!
+            </p>
           ) : (
             <div className="meetings-list">
               {meetings.map((meeting) => (
-                <div 
-                  key={meeting._id} 
-                  className={`meeting-item ${selectedMeeting?._id === meeting._id ? 'selected' : ''}`}
-                  onClick={() => setSelectedMeeting(meeting)}
+                <div
+                  key={meeting._id}
+                  className={`meeting-item ${
+                    selectedMeeting?._id === meeting._id ? "selected" : ""
+                  }`}
+                  onClick={() => handleMeetingClick(meeting)}
                 >
                   <div className="meeting-header">
-                    <h3>{meeting.title || 'Untitled Meeting'}</h3>
-                    <span className={`status-badge ${getStatusColor(meeting.status)}`}>
+                    <h3>{meeting.title || "Untitled Meeting"}</h3>
+                    <span
+                      className={`status-badge ${getStatusColor(
+                        meeting.status
+                      )}`}
+                    >
                       {meeting.status}
                     </span>
                   </div>
-                  <p className="meeting-date">{formatDate(meeting.uploadDate)}</p>
+                  <p className="meeting-date">
+                    {formatDate(meeting.uploadDate)}
+                  </p>
                   {meeting.metadata?.duration && (
                     <p className="meeting-duration">
-                      Duration: {Math.round(meeting.metadata.duration / 60)} minutes
+                      Duration: {Math.round(meeting.metadata.duration / 60)}{" "}
+                      minutes
                     </p>
                   )}
                 </div>
@@ -145,14 +199,14 @@ function App() {
         {selectedMeeting && (
           <div className="card">
             <h2>Meeting Details: {selectedMeeting.title}</h2>
-            
-            {selectedMeeting.status === 'failed' && (
+
+            {selectedMeeting.status === "failed" && (
               <div className="error-message">
                 <strong>Processing Failed:</strong> {selectedMeeting.error}
               </div>
             )}
 
-            {selectedMeeting.status === 'completed' && (
+            {selectedMeeting.status === "completed" && (
               <>
                 {/* Summary */}
                 {selectedMeeting.summary && (
@@ -182,7 +236,12 @@ function App() {
                     <h3>✅ Action Items</h3>
                     <div className="action-items-list">
                       {selectedMeeting.actionItems.map((item, index) => (
-                        <div key={index} className={`action-item ${item.completed ? 'completed' : ''}`}>
+                        <div
+                          key={index}
+                          className={`action-item ${
+                            item.completed ? "completed" : ""
+                          }`}
+                        >
                           <input
                             type="checkbox"
                             checked={item.completed}
@@ -195,18 +254,26 @@ function App() {
                                 fetchMeetings();
                                 setSelectedMeeting({
                                   ...selectedMeeting,
-                                  actionItems: selectedMeeting.actionItems.map(ai => 
-                                    ai._id === item._id ? { ...ai, completed: e.target.checked } : ai
-                                  )
+                                  actionItems: selectedMeeting.actionItems.map(
+                                    (ai) =>
+                                      ai._id === item._id
+                                        ? { ...ai, completed: e.target.checked }
+                                        : ai
+                                  ),
                                 });
                               } catch (error) {
-                                console.error('Error updating action item:', error);
+                                console.error(
+                                  "Error updating action item:",
+                                  error
+                                );
                               }
                             }}
                           />
                           <span className="action-text">{item.text}</span>
                           {item.owner && (
-                            <span className="action-owner">Owner: {item.owner}</span>
+                            <span className="action-owner">
+                              Owner: {item.owner}
+                            </span>
                           )}
                           {item.dueDate && (
                             <span className="action-due">
@@ -231,7 +298,7 @@ function App() {
               </>
             )}
 
-            {selectedMeeting.status === 'transcribing' && (
+            {selectedMeeting.status === "transcribing" && (
               <div className="processing-status">
                 <div className="loading"></div>
                 <p>Transcribing audio... This may take a few minutes.</p>

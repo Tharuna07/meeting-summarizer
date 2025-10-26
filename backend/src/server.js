@@ -16,8 +16,8 @@ app.use(express.json());
 app.use("/uploads", express.static(path.join(__dirname, "..", "uploads")));
 
 // API routes
-app.use("/api", uploadsRoute);
-app.use("/api", meetingsRoute);
+app.use("/api/uploads", uploadsRoute);
+app.use("/api/meetings", meetingsRoute);
 
 const PORT = process.env.PORT || 4000;
 
